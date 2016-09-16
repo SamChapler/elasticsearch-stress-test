@@ -1,9 +1,11 @@
 # Elasticsearch Stress Test - forked
-# This a forked version of the Elasticsearch Stress Test that adds a few specific features:
-# - The ability to specify ports
-# - The ability to specify multiple client addresses per cluster
-# - Support for user authentication
-# - Support for SSL connections
+
+### Fork Note
+This a forked version of the Elasticsearch Stress Test that adds a few specific features:
+* The ability to specify ports
+* The ability to specify multiple client addresses per cluster
+* Support for user authentication
+* Support for SSL connections
 
 ### Overview
 This script generates a bunch of documents, and indexes as much as it can to elasticsearch. While doing so, it prints out metrics to the screen to let you follow how your cluster is doing.
