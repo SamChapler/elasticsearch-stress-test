@@ -1,8 +1,13 @@
 #!/usr/bin/python
-
 #
 # Stress test tool for elasticsearch
 # Written by Roi Rav-Hon @ Logz.io (roi@logz.io)
+#
+# This fork has been modified to add some new features
+# - user authentication
+# - http and https support
+# - Ability to hit multiple client nodes per cluster
+# - Ability to specify ports for the ES cluster
 #
 
 import signal
@@ -27,6 +32,12 @@ import sys
 # For json operations
 import json
 
+# For https
+import certifi
+
+# For parsing the es_address argument
+import re
+
 # Try and import elasticsearch
 try:
     from elasticsearch import Elasticsearch
@@ -40,11 +51,14 @@ except:
 parser = argparse.ArgumentParser()
 
 # Adds all params
-parser.add_argument("--es_address", nargs='+', help="The address of your cluster (no protocol or port)", required=True)
+parser.add_argument("--es_address", nargs='+', help="The address(es) of your cluster (no protocol), port optional)", required=True)
 parser.add_argument("--indices", type=int, help="The number of indices to write to for each ip", required=True)
 parser.add_argument("--documents", type=int, help="The number different documents to write for each ip", required=True)
 parser.add_argument("--clients", type=int, help="The number of clients to write from for each ip", required=True)
 parser.add_argument("--seconds", type=int, help="The number of seconds to run for each ip", required=True)
+parser.add_argument("--use_https", action="store_true", help="Use https authentication. Otherwise use http")
+parser.add_argument("--username", default='', help="The user, if required, to connect to the cluster")
+parser.add_argument("--password", default='', help="The password, if required, to connect to the cluster")
 parser.add_argument("--number-of-shards", type=int, default=3, help="Number of shards per index (default 3)")
 parser.add_argument("--number-of-replicas", type=int, default=1, help="Number of replicas per index (default 1)")
 parser.add_argument("--bulk-size", type=int, default=1000, help="Number of document per request (default 1000)")
@@ -73,6 +87,9 @@ MAX_SIZE_PER_FIELD = args.max_size_per_field
 NO_CLEANUP = args.no_cleanup
 STATS_FREQUENCY = args.stats_frequency
 WAIT_FOR_GREEN = args.green
+USER = args.username
+PASSWORD = args.password
+HTTPS = args.use_https
 
 # timestamp placeholder
 STARTED_TIMESTAMP = 0
@@ -319,7 +336,6 @@ def print_stats_worker(STARTED_TIMESTAMP):
             # Print stats
             print_stats(STARTED_TIMESTAMP)
 
-
 def main():
     clients = []
     all_indecies = []
@@ -327,12 +343,43 @@ def main():
     # Set the timestamp
     STARTED_TIMESTAMP = int(time.time())
 
-    for esaddress in args.es_address:
+    for tmpaddress in args.es_address:
         print("")
+        # Pull out port numbers if specified
+        print("Parsing address string")
+        try:
+            #print tmpaddress
+            esaddress = []
+            tmplist = tmpaddress.split(',')
+            es_port = -1
+            #print("tmplist = {0}".format(tmplist))
+            for address in tmplist:
+                #print address
+                regexresult = re.match("([a-zA-Z_0-9.-]+)\:(\d+)",address)
+                if regexresult:
+                    esaddress.append(regexresult.group(1))
+                    if es_port > 0 and regexresult.group(2) != es_port:
+                        print("Error: Ports in {0} don't match".format(tmplist))
+                        sys.exit(1)
+                    else:
+                        es_port = regexresult.group(2)
+                else:
+                    esaddress.append(address)
+                    es_port = 9200
+        except:
+            print("Error parsing es_address string!")
+            sys.exit(1)
         print("Starting initialization of {0}".format(esaddress))
+        print("Port = {0}".format(es_port))
         try:
             # Initiate the elasticsearch session
-            es = Elasticsearch(esaddress)
+            es = Elasticsearch(esaddress,
+                               http_auth=(USER,PASSWORD),
+                               port=es_port,
+                               use_ssl=HTTPS,
+                               verify_certs=HTTPS,
+                               ca_certs=certifi.where(),
+                               )
 
         except Exception as e:
             print("Could not connect to elasticsearch!")

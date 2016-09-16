@@ -1,4 +1,9 @@
-# Elasticsearch Stress Test
+# Elasticsearch Stress Test - forked
+# This a forked version of the Elasticsearch Stress Test that adds a few specific features:
+# - The ability to specify ports
+# - The ability to specify multiple client addresses per cluster
+# - Support for user authentication
+# - Support for SSL connections
 
 ### Overview
 This script generates a bunch of documents, and indexes as much as it can to elasticsearch. While doing so, it prints out metrics to the screen to let you follow how your cluster is doing.
@@ -20,7 +25,7 @@ The generation of documents is being processed before the run, so it will not ov
 ### Mandatory Parameters
 | Parameter | Description |
 | --- | --- |
-| `--es_address` | Address of the Elasticsearch cluster (no protocol and port). You can supple mutiple clusters here, but only **one** node in each cluster (preferably the client node) |
+| `--es_address` | Address of the Elasticsearch cluster (no protocol, port is optional). You can supply mutiple clusters here separated by spaces. You can specify multiple client nodes in the same cluster, separated by commas (no spaces). Also ports can be specified with :port after an address. Note if ports are specified for a cluster with multiple client addresses, then the ports must all match |
 | `--indices` | Number of indices to write to |
 | `--documents` | Number of template documents that hold the same mapping |
 | `--clients` | Number of threads that send bulks to ES |
@@ -38,6 +43,9 @@ The generation of documents is being processed before the run, so it will not ov
 | `--no-cleanup` | Boolean field. Don't delete the indices after completion |False|
 | `--stats-frequency` | How frequent to show the statistics |30|
 | `--not-green` | Script doesn't wait for the cluster to be green |False|
+| `--use_https` | Try to use SSL to connect to the cluster. If testing multiple clusters, this setting applies to all |False|
+| `--username` | Username used to connect to the cluster. If testing multiple clusters, this user must be available on all ||
+| `--password` | Password used to connect to the cluster. If testing multiple clusters, this password must be the same across all clusters ||
 
 
 ### Examples
@@ -49,6 +57,11 @@ python elasticsearch-stress-test.py  --es_address 1.2.3.4 1.2.3.5 --indices 4 --
 Run the test on ES cluster 1.2.3.4, with 10 indices, 10 random documents with up to 10 fields in each, the size of each field on each document can be up to 50 chars, each index will have 1 shard and no replicas, the test will run from 1 client (thread) for 300 seconds, will print statistics every 15 seconds, will index in bulks of 5000 documents and will leave everything in elasticsearch after the test
 ```bash
  python elasticsearch-stress-test.py --es_address 1.2.3.4 --indices 10 --documents 10 --clients 1 --seconds 300 --number-of-shards 1 --number-of-replicas 0 --bulk-size 5000 --max-fields-per-document 10 --max-size-per-field 50 --no-cleanup --stats-frequency 15
+```
+
+Run the test on ES cluster with two clients 1.2.3.4 and 5.6.7.8 on port 9999, with 10 indices, 10 random documents with up to 10 fields in each, the size of each field on each document can be up to 50 chars, each index will have 1 shard and no replicas, the test will run from 1 client (thread) for 300 seconds, will print statistics every 15 seconds, will index in bulks of 5000 documents and will leave everything in elasticsearch after the test
+```bash
+ python elasticsearch-stress-test.py --es_address 1.2.3.4:9999,5.6.7.8:9999 --indices 10 --documents 10 --clients 1 --seconds 300 --number-of-shards 1 --number-of-replicas 0 --bulk-size 5000 --max-fields-per-document 10 --max-size-per-field 50 --no-cleanup --stats-frequency 15
 ```
 
 ### Contribution
