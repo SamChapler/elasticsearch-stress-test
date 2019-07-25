@@ -430,9 +430,9 @@ def main():
                 c.join(timeout=0.1)
             except KeyboardInterrupt:
                 print("")
-                print "Ctrl-c received! Sending kill to threads..."
+                print("Ctrl-c received! Sending kill to threads...")
                 shutdown_event.set()
-                
+
                 # set loop flag true to get into loop
                 flag = True
                 while flag:
@@ -445,7 +445,7 @@ def main():
                         # if one single thread is still alive repeat the loop
                         if t.isAlive():
                             flag = True
-                            
+
                 print("Cleaning up created indices.. "),
                 cleanup_indices(es, all_indecies)
 
