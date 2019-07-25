@@ -42,9 +42,10 @@ import re
 try:
     from elasticsearch import Elasticsearch
 
-except:
-    print("Could not import elasticsearch..")
-    print("Try: pip install elasticsearch")
+except Exception as e:
+    print("""Could not import elasticsearch...
+Try: pip install elasticsearch
+Error: {}""".format(e))
     sys.exit(1)
 
 # Set a parser object
@@ -114,7 +115,7 @@ shutdown_event = Event()
 def increment_success():
     # First, lock
     success_lock.acquire()
-    global  success_bulks
+    global success_bulks
     try:
         # Increment counter
         success_bulks += 1
@@ -165,8 +166,8 @@ def has_timeout(STARTED_TIMESTAMP):
 def generate_random_int(max_size):
     try:
         return randint(1, max_size)
-    except:
-        print("Not supporting {0} as valid sizes!".format(max_size))
+    except Exception as e:
+        print("Not supporting {0} as valid sizes! Error: {1}".format(max_size, e))
         sys.exit(1)
 
 
@@ -214,7 +215,8 @@ def client_worker(es, indices, STARTED_TIMESTAMP):
         # Iterate over the bulk size
         for _ in range(BULK_SIZE):
             # Generate the bulk operation
-            curr_bulk += "{0}\n".format(json.dumps({"index": {"_index": choice(indices), "_type": "stresstest"}}))
+            bulk_dict = {"index": {"_index": choice(indices), "_type": "stresstest"}}
+            curr_bulk += "{0}\n".format(json.dumps(bulk_dict))
             curr_bulk += "{0}\n".format(json.dumps(choice(documents)))
 
         try:
@@ -227,8 +229,7 @@ def client_worker(es, indices, STARTED_TIMESTAMP):
             # Adding to size (in bytes)
             increment_size(sys.getsizeof(str(curr_bulk)))
 
-        except:
-
+        except Exception:
             # Failed. incrementing failure
             increment_failure()
 
@@ -275,11 +276,13 @@ def generate_indices(es):
         temp_indices.append(temp_index)
 
         try:
+            body = {"settings": {
+                    "number_of_shards": NUMBER_OF_SHARDS,
+                    "number_of_replicas": NUMBER_OF_REPLICAS}}
             # And create it in ES with the shard count and replicas
-            es.indices.create(index=temp_index, body={"settings": {"number_of_shards": NUMBER_OF_SHARDS,
-                                                                   "number_of_replicas": NUMBER_OF_REPLICAS}})
+            es.indices.create(index=temp_index, body=body)
 
-        except:
+        except Exception:
             print("Could not create index. Is your cluster ok?")
 
     # Return the indices
@@ -293,7 +296,7 @@ def cleanup_indices(es, indices):
             # Delete the index
             es.indices.delete(index=curr_index, ignore=[400, 404])
 
-        except:
+        except Exception:
             print("Could not delete index: {0}. Continue anyway..".format(curr_index))
 
 
@@ -336,6 +339,7 @@ def print_stats_worker(STARTED_TIMESTAMP):
             # Print stats
             print_stats(STARTED_TIMESTAMP)
 
+
 def main():
     clients = []
     all_indecies = []
@@ -348,14 +352,14 @@ def main():
         # Pull out port numbers if specified
         print("Parsing address string")
         try:
-            #print tmpaddress
+            # print tmpaddress
             esaddress = []
             tmplist = tmpaddress.split(',')
             es_port = -1
-            #print("tmplist = {0}".format(tmplist))
+            # print("tmplist = {0}".format(tmplist))
             for address in tmplist:
-                #print address
-                regexresult = re.match("([a-zA-Z_0-9.-]+)\:(\d+)",address)
+                # print address
+                regexresult = re.match("([a-zA-Z_0-9.-]+)\:(\d+)", address)
                 if regexresult:
                     esaddress.append(regexresult.group(1))
                     if es_port > 0 and regexresult.group(2) != es_port:
@@ -366,7 +370,7 @@ def main():
                 else:
                     esaddress.append(address)
                     es_port = 9200
-        except:
+        except Exception:
             print("Error parsing es_address string!")
             sys.exit(1)
         print("Starting initialization of {0}".format(esaddress))
@@ -374,7 +378,7 @@ def main():
         try:
             # Initiate the elasticsearch session
             es = Elasticsearch(esaddress,
-                               http_auth=(USER,PASSWORD),
+                               http_auth=(USER, PASSWORD),
                                port=es_port,
                                use_ssl=HTTPS,
                                verify_certs=HTTPS,
@@ -382,7 +386,7 @@ def main():
                                )
 
         except Exception as e:
-            print("Could not connect to elasticsearch!")
+            print("Could not connect to elasticsearch! Error: {}".format(e))
             sys.exit(1)
 
         # Generate docs
@@ -396,10 +400,10 @@ def main():
         all_indecies.extend(indices)
 
         try:
-            #wait for cluster to be green if nothing else is set
+            # wait for cluster to be green if nothing else is set
             if WAIT_FOR_GREEN:
                 es.cluster.health(wait_for_status='green', master_timeout='600s', timeout='600s')
-        except Exception as e:
+        except Exception:
             print("Cluster timeout....")
             print("Cleaning up created indices.. "),
 
@@ -425,7 +429,7 @@ def main():
     stats_thread.start()
 
     for c in clients:
-       while c.is_alive():
+        while c.is_alive():
             try:
                 c.join(timeout=0.1)
             except KeyboardInterrupt:
@@ -436,12 +440,12 @@ def main():
                 # set loop flag true to get into loop
                 flag = True
                 while flag:
-                    #sleep 2 secs that we don't loop to often
-                    sleep(2)
+                    # sleep 2 secs that we don't loop to often
+                    time.sleep(2)
                     # set loop flag to false. If there is no thread still alive it will stay false
                     flag = False
                     # loop through each running thread and check if it is alive
-                    for t in threading.enumerate():
+                    for t in c.enumerate():
                         # if one single thread is still alive repeat the loop
                         if t.isAlive():
                             flag = True
@@ -460,6 +464,7 @@ def main():
 
         print("Done!")  # # Main runner
 
+
 try:
     main()
 
@@ -468,5 +473,4 @@ except Exception as e:
     print("")
     print(e.message)
     print("")
-
     sys.exit(1)
